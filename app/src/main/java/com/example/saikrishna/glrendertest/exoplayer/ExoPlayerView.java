@@ -4,6 +4,7 @@ import android.annotation.TargetApi;
 import android.content.Context;
 import android.support.v4.content.ContextCompat;
 import android.util.AttributeSet;
+import android.util.Log;
 import android.view.Gravity;
 import android.view.SurfaceView;
 import android.view.TextureView;
@@ -33,6 +34,17 @@ import java.util.List;
 
 @TargetApi(16)
 public final class ExoPlayerView extends FrameLayout {
+    @Override
+    protected void onAttachedToWindow() {
+        Log.d("--bug--", "Attached");
+        super.onAttachedToWindow();
+    }
+
+    @Override
+    protected void onDetachedFromWindow() {
+        Log.d("--bug--", "Detached");
+        super.onDetachedFromWindow();
+    }
 
     private View surfaceView;
     private final View shutterView;
@@ -101,6 +113,12 @@ public final class ExoPlayerView extends FrameLayout {
         }
     }
 
+    public void clearTextureView() {
+        if (surfaceView instanceof TextureView) {
+            player.clearVideoTextureView((TextureView) surfaceView);
+        }
+    }
+
     private void updateSurfaceView() {
         View view;
         if (useGreenScreen) {
@@ -128,6 +146,14 @@ public final class ExoPlayerView extends FrameLayout {
                         player.setTextOutput(componentListener);
                     }
                 }
+
+                @Override
+                public void onSurfaceDestroyed() {
+                    if (ExoPlayerView.this.player != null) {
+                        clearTextureView();
+                        updateSurfaceView();
+                    }
+                }
             });
         } else {
             if (this.player != null) {
@@ -138,6 +164,7 @@ public final class ExoPlayerView extends FrameLayout {
 
     public interface OnSurfaceCreatedCallBack {
         void onSurfaceCreated();
+        void onSurfaceDestroyed();
     }
 
     /**
@@ -363,5 +390,4 @@ public final class ExoPlayerView extends FrameLayout {
             // Do nothing.
         }
     }
-
 }

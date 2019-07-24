@@ -17,7 +17,7 @@ public class Main2Activity extends AppCompatActivity {
         setContentView(R.layout.activity_main2);
         linearLayout = findViewById(R.id.ll);
         reactExoplayerView = new ReactExoplayerView(this);
-        Uri srcUri = Uri.parse("https://player.uacdn.net/lesson-raw/CWWETN4I3OWAFV4EXXRQ/output_high.webm");
+        Uri srcUri = Uri.parse("https://player.uacdn.net/lesson-raw/YEU14M8NPF0CYEZC2TVG/output.mp4");
         if (srcUri != null) {
             reactExoplayerView.setProgressUpdateInterval(50);
             reactExoplayerView.setUseGreenScreen(true);

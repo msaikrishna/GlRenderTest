@@ -26,6 +26,7 @@ import android.view.Surface;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 import java.nio.FloatBuffer;
+import java.util.Locale;
 
 import javax.microedition.khronos.egl.EGLConfig;
 import javax.microedition.khronos.opengles.GL10;
@@ -60,30 +61,35 @@ public class VideoRenderer implements GLTextureView.Renderer, SurfaceTexture.OnF
                     "  vTextureCoord = (uSTMatrix * aTextureCoord).xy;\n" +
                     "}\n";
 
-    public static String alphaShader = "#extension GL_OES_EGL_image_external : require\n"
+    private final String alphaShader =  "#extension GL_OES_EGL_image_external : require\n"
             + "precision mediump float;\n"
             + "varying vec2 vTextureCoord;\n"
             + "uniform samplerExternalOES sTexture;\n"
             + "varying mediump float text_alpha_out;\n"
             + "void main() {\n"
-            +"  float pixelSat, secondaryComponents;\n"
+            +" float pixelSat, secondaryComponents, secondaryComponents1;\n"
             + " vec4 sourcePixel = texture2D(sTexture, vTextureCoord);\n"
             +"  float fmin = min(min(sourcePixel.r, sourcePixel.g), sourcePixel.b);\n"
             +"  float fmax = max(max(sourcePixel.r, sourcePixel.g), sourcePixel.b);\n"
             +"  vec4 screen = vec4(0.0,1.0,0.0,1.0);\n"
             +"	float fmax1 = max(max(screen.r, screen.g), screen.b);\n"
+            +"	float fmin1 = min(min(screen.r, screen.g), screen.b);\n"
             +"  vec3 screenPrimary = step(fmax1, screen.rgb);\n"
             +"  vec3 pixelPrimary = step(fmax, sourcePixel.rgb);\n"
             +"  secondaryComponents = dot(1.0 - pixelPrimary, sourcePixel.rgb);\n"
-            +"  float screenSat = fmax - mix(secondaryComponents - fmin, secondaryComponents / 2.0, 1.0);\n"
+            +"  secondaryComponents1 = dot(1.0 - screenPrimary, screen.rgb);\n"
+            +"  float screenSat = fmax1 - mix(secondaryComponents1 - fmin1, secondaryComponents1 / 2.0, 1.0);\n"
             +"  float isSolidSet = 0.0;\n"
             +"  pixelSat = fmax - mix(secondaryComponents - fmin, secondaryComponents / 2.0, 1.0);\n"
             +"  float diffPrimary = dot(abs(pixelPrimary - screenPrimary), vec3(1.0));\n"
             +"  float solid = step(1.0, step(pixelSat, 0.1) + step(fmax, 0.1) + diffPrimary);\n"
-            +"   gl_FragColor = vec4(sourcePixel.r, sourcePixel.g, sourcePixel.b,1.0);\n"
+            +"  float alpha = max(0.0, 1.0 - pixelSat / screenSat);\n"
+            +"  alpha = smoothstep(0.0, 1.0, alpha);\n"
+            +"  vec4 semiTransparentPixel = vec4((sourcePixel.rgb - (1.0 - alpha) * screen.rgb * 1.0) / max(0.00001, alpha), alpha);\n"
+            +"  vec4 pixel = mix(semiTransparentPixel, sourcePixel, solid);\n"
+            +"  gl_FragColor=pixel;\n"
             +"if(solid == 0.0)\n"
             +"{\n"
-            +"gl_FragColor=vec4(sourcePixel.r, sourcePixel.g, sourcePixel.b, 0.0);\n"
             +"isSolidSet=1.0;\n"
             +"}\n"
             +"if(isSolidSet == 0.0)\n"
@@ -103,6 +109,7 @@ public class VideoRenderer implements GLTextureView.Renderer, SurfaceTexture.OnF
             +"  }\n"
             +"}\n"
             +"}\n";
+
 
 
 
@@ -144,7 +151,6 @@ public class VideoRenderer implements GLTextureView.Renderer, SurfaceTexture.OnF
 
     @Override
     public void onDrawFrame(GL10 glUnused) {
-        Log.d("--Renderder--", "ondrawframe");
         synchronized(this) {
             if (updateSurface) {
                 surface.updateTexImage();
@@ -229,7 +235,7 @@ public class VideoRenderer implements GLTextureView.Renderer, SurfaceTexture.OnF
         prepareSurface();
     }
 
-    public void prepareSurface() {
+    private void prepareSurface() {
         int[] textures = new int[1];
         GLES20.glGenTextures(1, textures, 0);
 
@@ -346,10 +352,5 @@ public class VideoRenderer implements GLTextureView.Renderer, SurfaceTexture.OnF
     interface OnSurfacePrepareListener {
         void surfacePrepared(Surface surface);
     }
-
-    public void setSurfaceTexture(SurfaceTexture surface) {
-        this.surface = surface;
-    }
-
 
 }

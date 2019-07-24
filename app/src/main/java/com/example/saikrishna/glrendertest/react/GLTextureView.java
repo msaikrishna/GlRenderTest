@@ -25,6 +25,7 @@ import android.view.Surface;
 import android.view.TextureView;
 import android.view.View;
 
+
 import com.example.saikrishna.glrendertest.exoplayer.ExoPlayerView;
 
 import java.io.Writer;
@@ -165,7 +166,7 @@ public class GLTextureView
 
     /**
      * Set the glWrapper. If the glWrapper is not null, its
-     * {@link GLWrapper#wrap(GL)} method is called
+     * {@link GLWrapper#wrap(javax.microedition.khronos.opengles.GL)} method is called
      * whenever a surface is created. A GLWrapper can be used to wrap
      * the GL object that's passed to the renderer. Wrapping a GL
      * object enables examining and modifying the behavior of the
@@ -491,6 +492,31 @@ public class GLTextureView
     @Override
     protected void onAttachedToWindow() {
         super.onAttachedToWindow();
+        resetThreadResourcesForAttach();
+    }
+
+    /**
+     * This method is used as part of the View class and is not normally
+     * called or subclassed by clients of GLTextureView.
+     * Must not be called before a renderer has been set.
+     */
+    @Override
+    protected void onDetachedFromWindow() {
+        cleanThreadResourcesForDetach();
+        super.onDetachedFromWindow();
+    }
+
+    void cleanThreadResourcesForDetach() {
+        if (LOG_ATTACH_DETACH) {
+            Log.d(TAG, "onDetachedFromWindow");
+        }
+        if (mGLThread != null) {
+            mGLThread.requestExitAndWait();
+        }
+        mDetached = true;
+    }
+
+    void resetThreadResourcesForAttach() {
         if (LOG_ATTACH_DETACH) {
             Log.d(TAG, "onAttachedToWindow reattach =" + mDetached);
         }
@@ -508,31 +534,18 @@ public class GLTextureView
         mDetached = false;
     }
 
-    /**
-     * This method is used as part of the View class and is not normally
-     * called or subclassed by clients of GLTextureView.
-     * Must not be called before a renderer has been set.
-     */
-    @Override
-    protected void onDetachedFromWindow() {
-        if (LOG_ATTACH_DETACH) {
-            Log.d(TAG, "onDetachedFromWindow");
-        }
-        if (mGLThread != null) {
-            mGLThread.requestExitAndWait();
-        }
-        mDetached = true;
-        super.onDetachedFromWindow();
-    }
-    private boolean isSurfaceDestroyed = false;
     public void onLayoutChange(View v, int left, int top, int right, int bottom,
                                int oldLeft, int oldTop, int oldRight, int oldBottom) {
         surfaceChanged(getSurfaceTexture(), 0, right - left, bottom - top);
     }
 
     public void onSurfaceTextureAvailable(SurfaceTexture surface, int width, int height) {
-        surfaceCreated(surface);
-        surfaceChanged(surface, 0, width, height);
+        if (newSurfaceTextureListener != null) {
+            newSurfaceTextureListener.onSurfaceTextureAvailable(surface, width, height);
+        } else {
+            surfaceCreated(surface);
+            surfaceChanged(surface, 0, width, height);
+        }
     }
     public void onSurfaceTextureSizeChanged(SurfaceTexture surface, int width, int height) {
         if(newSurfaceTextureListener != null) {
@@ -547,8 +560,8 @@ public class GLTextureView
     public boolean onSurfaceTextureDestroyed(SurfaceTexture surface) {
         if(newSurfaceTextureListener != null) {
             newSurfaceTextureListener.onSurfaceTextureDestroyed(surface);
-        } else {
         }
+        surfaceDestroyed(surface);
         return true;
     }
 
@@ -626,7 +639,7 @@ public class GLTextureView
      * the EGL context is lost, all OpenGL resources (such as textures) that are
      * associated with that context will be automatically deleted. In order to
      * keep rendering correctly, a renderer must recreate any lost resources
-     * that it still needs. The {@link #onSurfaceCreated(GL10, EGLConfig)} method
+     * that it still needs. The {@link #onSurfaceCreated(javax.microedition.khronos.opengles.GL10, javax.microedition.khronos.egl.EGLConfig)} method
      * is a convenient place to do this.
      *
      *
@@ -978,9 +991,9 @@ public class GLTextureView
                 mEglConfig = view.mEGLConfigChooser.chooseConfig(mEgl, mEglDisplay);
 
                 /*
-                * Create an EGL context. We want to do this as rarely as we can, because an
-                * EGL context is a somewhat heavy object.
-                */
+                 * Create an EGL context. We want to do this as rarely as we can, because an
+                 * EGL context is a somewhat heavy object.
+                 */
                 mEglContext = view.mEGLContextFactory.createContext(mEgl, mEglDisplay, mEglConfig);
             }
             if (mEglContext == null || mEglContext == EGL10.EGL_NO_CONTEXT) {
@@ -1444,7 +1457,6 @@ public class GLTextureView
                             continue;
                         }
                         createEglSurface = false;
-                        surfaceDestroyed = false;
                     }
 
                     if (createGlInterface) {
@@ -1581,7 +1593,6 @@ public class GLTextureView
                     Log.i("GLThread", "surfaceDestroyed tid=" + getId());
                 }
                 mHasSurface = false;
-                surfaceDestroyed = true;
                 sGLThreadManager.notifyAll();
                 while((!mWaitingForSurface) && (!mExited)) {
                     try {
@@ -1715,7 +1726,6 @@ public class GLTextureView
         private ArrayList<Runnable> mEventQueue = new ArrayList<Runnable>();
         private boolean mSizeChanged = true;
         private boolean isInitialSizeChangeWhenCreated = true;
-        private boolean surfaceDestroyed = false;
 
         // End of member variables protected by the sGLThreadManager monitor.
 
